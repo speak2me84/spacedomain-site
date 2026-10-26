@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpaceDomain — Build your place in orbit</title>
+<meta name="description" content="SpaceDomain is an app in development: design rockets, boosters, spacecraft and space stations, and fly them among real satellites using AI-generated space data.">
+<style>
+:root{--bg:#000;--fg:#f5f5f7;--mute:#86868b;--accent:#2997ff;--card:#0d0d10;}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+a{color:inherit;}
+.nav{position:fixed;top:0;left:0;right:0;z-index:20;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 max(16px,4vw);background:rgba(0,0,0,.55);backdrop-filter:saturate(180%) blur(18px);-webkit-backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
+.nav b{font-size:15px;font-weight:600;letter-spacing:-.01em;}
+.nav nav{display:flex;gap:26px;}
+.nav nav a{text-decoration:none;color:#d2d2d7;}
+.nav nav a:hover{color:#fff;}
+.nav .pill{padding:5px 12px;border-radius:980px;background:var(--accent);color:#fff;text-decoration:none;}
+@media (max-width:700px){.nav nav a:not(.pill){display:none;}}
+
+.stage{position:relative;height:820vh;}
+.sticky{position:sticky;top:0;height:100vh;width:100%;overflow:hidden;}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%);}
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease;pointer-events:none;}
+.scene.on{opacity:1;transform:none;}
+.scene.center{align-items:center;text-align:center;justify-content:flex-start;padding:16vh 24px 0;}
+.scene.bottom{align-items:center;text-align:center;justify-content:flex-end;padding:0 24px 9vh;}
+.scene.left{justify-content:center;padding:0 0 0 max(24px,7vw);}
+.scene.left .copy{max-width:470px;}
+.eyebrow{font-size:clamp(14px,1.3vw,18px);font-weight:600;color:var(--accent);margin:0 0 12px;letter-spacing:.005em;}
+.badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:#d2d2d7;border:1px solid rgba(255,255,255,.18);border-radius:980px;padding:6px 14px;margin-bottom:22px;background:rgba(255,255,255,.04);}
+.badge i{width:7px;height:7px;border-radius:50%;background:#30d158;box-shadow:0 0 10px #30d158;animation:pulse 2s infinite;}
+@keyframes pulse{50%{opacity:.35}}
+h1,h2{font-weight:700;letter-spacing:-.03em;line-height:1.04;margin:0;}
+h1{font-size:clamp(52px,9vw,128px);}
+h2{font-size:clamp(36px,5vw,72px);}
+.grad{background:linear-gradient(90deg,#9fc5ff 0%,#d6e8ff 45%,#f0c9ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lead{font-size:clamp(17px,1.6vw,22px);line-height:1.42;color:var(--mute);margin:18px 0 0;font-weight:500;}
+.center .lead,.bottom .lead{max-width:740px;margin-left:auto;margin-right:auto;}
+.lead b{color:var(--fg);font-weight:600;}
+.scene h1,.scene h2,.scene .lead{text-shadow:0 2px 24px rgba(0,0,0,.85);}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px;}
+.chip{font-size:13px;color:#e8e8ed;padding:8px 14px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-variant-numeric:tabular-nums;transition:background .3s;}
+.chip em{font-style:normal;color:var(--mute);margin-right:6px;}
+.chip.flash{background:rgba(41,151,255,.28);}
+.progress{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:3;}
+.progress i{width:6px;height:6px;border-radius:50%;background:#3a3a3c;transition:background .4s,transform .4s;}
+.progress i.on{background:#f5f5f7;transform:scale(1.4);}
+.cue{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);font-size:11px;color:var(--mute);letter-spacing:.24em;text-transform:uppercase;transition:opacity .5s;}
+.tag{position:absolute;left:0;top:0;pointer-events:none;font-size:11px;line-height:1.35;color:#e8e8ed;padding:6px 9px;border-radius:8px;background:rgba(10,14,22,.7);border:1px solid rgba(41,151,255,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);white-space:nowrap;opacity:0;transition:opacity .4s;transform:translate(14px,-50%);}
+.tag b{display:block;font-size:12px;color:#fff;}
+.tag span{color:#64d2ff;}
+.tag:before{content:"";position:absolute;left:-14px;top:50%;width:12px;height:1px;background:rgba(41,151,255,.7);}
+.tag:after{content:"";position:absolute;left:-18px;top:calc(50% - 3px);width:6px;height:6px;border-radius:50%;background:#64d2ff;box-shadow:0 0 8px #64d2ff;}
+.nogl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:var(--mute);}
+
+@media (max-width:820px){
+  .scene.left{justify-content:flex-end;align-items:center;text-align:center;padding:0 22px 7vh;}
+  .scene.left .copy{max-width:560px;}
+  .scene.left .chips{justify-content:center;}
+  .progress{display:none;}
+  .scene.center{padding-top:13vh;}
+}
+
+section.block{padding:130px max(20px,5vw);max-width:1200px;margin:0 auto;}
+.block-head{text-align:center;margin-bottom:56px;}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{grid-column:span 2;background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:28px;padding:36px 30px;min-height:300px;display:flex;flex-direction:column;opacity:0;transform:translateY(40px);transition:opacity .9s ease,transform .9s ease;position:relative;overflow:hidden;}
+.card.wide{grid-column:span 3;}
+.card.on{opacity:1;transform:none;}
+.card .k{font-size:13px;font-weight:600;color:var(--accent);}
+.card h3{font-size:clamp(24px,2.2vw,30px);font-weight:700;letter-spacing:-.02em;margin:12px 0 12px;line-height:1.1;}
+.card p{font-size:16px;line-height:1.5;color:var(--mute);margin:0;}
+.card ul{margin:auto 0 0;padding:20px 0 0;list-style:none;display:flex;flex-wrap:wrap;gap:6px;}
+.card li{font-size:12px;color:#d2d2d7;padding:5px 10px;border-radius:8px;background:rgba(255,255,255,.06);}
+.card:after{content:"";position:absolute;right:-80px;top:-80px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(41,151,255,.16),rgba(41,151,255,0) 70%);}
+@media (max-width:900px){.card,.card.wide{grid-column:span 6;}}
+
+.dev{text-align:center;padding:40px 24px 30px;}
+.dev .bar{max-width:560px;height:6px;border-radius:6px;background:#1d1d1f;margin:30px auto 10px;overflow:hidden;}
+.dev .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2997ff,#bf5af2);border-radius:6px;transition:width 2.2s cubic-bezier(.2,.8,.2,1);}
+.dev .bar.on i{width:38%;}
+.dev small{color:var(--mute);font-size:13px;}
+
+.contact{padding:150px 24px 170px;text-align:center;background:radial-gradient(ellipse at 50% 125%,#0b2a5a 0%,#000 62%);}
+.btn{display:inline-block;margin-top:36px;padding:16px 34px;border-radius:980px;background:var(--accent);color:#fff;font-size:18px;font-weight:500;text-decoration:none;transition:background .25s,transform .25s;}
+.btn:hover{background:#0077ed;transform:scale(1.03);}
+.mail{display:block;margin-top:18px;color:var(--mute);font-size:17px;text-decoration:none;}
+.mail:hover{color:#fff;}
+footer{padding:22px;text-align:center;font-size:12px;color:#6e6e73;border-top:1px solid #1d1d1f;}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+
+<header class="nav">
+  <b>SpaceDomain</b>
+  <nav><a href="#build">Build</a><a href="#features">Features</a><a href="#contact">Contact</a><a class="pill" href="mailto:info@spacedomain.ai">Get updates</a></nav>
+</header>
+
+<section class="stage" id="build">
+  <div class="sticky">
+    <canvas id="gl"></canvas>
+    <div class="vignette"></div>
+    <div class="nogl" id="nogl">3D preview requires WebGL.</div>
+
+    <div class="scene center on" data-s="0">
+      <div class="badge"><i></i>App in development</div>
+      <h1>SpaceDomain</h1>
+      <p class="lead">Design rockets, spacecraft and space stations — then fly them among <b>real satellites</b>, powered by <b>AI‑generated space data</b>.</p>
+    </div>
+
+    <div class="scene bottom" data-s="1">
+      <p class="eyebrow">Real satellites · AI space data</p>
+      <h2>The real sky, <span class="grad">reconstructed by AI.</span></h2>
+      <p class="lead">SpaceDomain will use public orbital data for real satellites, spacecraft and debris, and AI to generate detailed 3D projections of each one — moving in true orbital motion.</p>
+    </div>
+
+    <div class="scene left" data-s="2">
+      <div class="copy">
+        <p class="eyebrow">Rockets &amp; boosters</p>
+        <h2>Build your launch vehicle.</h2>
+        <p class="lead">Choose stages, engines, side boosters and fairings. Tune thrust, fuel and payload — and watch your rocket assemble, part by part.</p>
+        <div class="chips">
+          <span class="chip" data-c="stages"><em>Stages</em>1</span>
+          <span class="chip" data-c="boost"><em>Side boosters</em>0</span>
+          <span class="chip" data-c="eng"><em>Engines</em>3</span>
+          <span class="chip" data-c="fair"><em>Fairing</em>—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene left" data-s="3">
+      <div class="copy">
+        <p class="eyebrow">Spacecraft</p>
+        <h2>Customize every spacecraft.</h2>
+        <p class="lead">Crew capsules, service modules, solar arrays, antennas and thrusters. Swap parts, change finishes and layouts — make it yours.</p>
+        <div class="chips">
+          <span class="chip" data-c="hull"><em>Hull</em>Ceramic white</span>
+          <span class="chip" data-c="arr"><em>Solar arrays</em>2</span>
+          <span class="chip" data-c="dish"><em>Antenna</em>High‑gain</span>
+          <span class="chip" data-c="rcs"><em>RCS thrusters</em>16</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene left" data-s="4">
+      <div class="copy">
+        <p class="eyebrow">Space stations</p>
+        <h2>Assemble a station in orbit.</h2>
+        <p class="lead">Dock modules one by one — habitats, labs, nodes, trusses, radiators and solar wings — and grow your own outpost in low Earth orbit.</p>
+        <div class="chips">
+          <span class="chip" data-c="mods"><em>Modules</em>1</span>
+          <span class="chip" data-c="wings"><em>Solar wings</em>0</span>
+          <span class="chip" data-c="crew"><em>Crew capacity</em>0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene bottom" data-s="5">
+      <p class="eyebrow">Interact</p>
+      <h2>Fly. Dock. <span class="grad">Explore.</span></h2>
+      <p class="lead">Launch what you build into an AI‑generated sky. Rendezvous with real satellites, dock with stations and explore orbit from any angle.</p>
+    </div>
+
+    <div class="tag" id="tag0"><b>ISS</b>Low Earth orbit · <span>AI projection</span></div>
+    <div class="tag" id="tag1"><b>Hubble Space Telescope</b>Low Earth orbit · <span>AI projection</span></div>
+    <div class="tag" id="tag2"><b>Debris fragment</b>Tracked object · <span>Predicted path</span></div>
+
+    <div class="progress"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cue">Scroll</div>
+  </div>
+</section>
+
+<section class="block" id="features">
+  <div class="block-head">
+    <p class="eyebrow">What you'll be able to do</p>
+    <h2>Everything you need<br>to build in space.</h2>
+  </div>
+  <div class="grid">
+    <div class="card"><span class="k">Rockets &amp; boosters</span><h3>Launch vehicles, your way.</h3><p>Stack stages, pick engines, strap on boosters and choose a fairing for your payload.</p><ul><li>Stages</li><li>Engines</li><li>Side boosters</li><li>Fairings</li></ul></div>
+    <div class="card"><span class="k">Spacecraft</span><h3>Every part customizable.</h3><p>Capsules, service modules, solar arrays, antennas, thrusters and finishes.</p><ul><li>Capsules</li><li>Solar arrays</li><li>Antennas</li><li>Materials</li></ul></div>
+    <div class="card"><span class="k">Space stations</span><h3>Build an outpost.</h3><p>Dock habitats, labs and nodes onto trusses with radiators and solar wings.</p><ul><li>Habitats</li><li>Labs</li><li>Trusses</li><li>Docking</li></ul></div>
+    <div class="card wide"><span class="k">Real satellites</span><h3>Interact with what's really up there.</h3><p>See real satellites, stations and debris where they actually are, then fly your own spacecraft alongside them.</p><ul><li>Public orbital data</li><li>Rendezvous</li><li>Inspection</li></ul></div>
+    <div class="card wide"><span class="k">AI space data</span><h3>Projections generated by AI.</h3><p>AI turns raw orbital data into detailed 3D projections of satellites, ships and debris, and predicts where they're headed next.</p><ul><li>3D projections</li><li>Orbit prediction</li><li>Close approaches</li></ul></div>
+  </div>
+</section>
+
+<section class="dev">
+  <div class="badge"><i></i>Currently in development</div>
+  <h2>We're building it now.</h2>
+  <p class="lead" style="max-width:640px;margin:18px auto 0;">SpaceDomain is in active development. Reach out to follow along, partner with us or get early access.</p>
+  <div class="bar" id="bar"><i></i></div>
+  <small>Development in progress</small>
+</section>
+
+<section class="contact" id="contact">
+  <p class="eyebrow">Contact us</p>
+  <h2>Let's talk.</h2>
+  <p class="lead" style="max-width:620px;margin:18px auto 0;">Questions, partnerships or early access — we'd love to hear from you.</p>
+  <a class="btn" href="mailto:info@spacedomain.ai">Email us</a>
+  <a class="mail" href="mailto:info@spacedomain.ai">info@spacedomain.ai</a>
+</section>
+<footer>© SpaceDomain. All rights reserved.</footer>
+
+<script>
+(function(){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)e.target.classList.add('on');});},{threshold:.2});
+  document.querySelectorAll('.card').forEach(function(c,i){c.style.transitionDelay=((i%3)*.1)+'s';io.observe(c);});
+  io.observe(document.getElementById('bar'));
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const canvas=document.getElementById('gl'), stage=document.querySelector('.stage');
+let renderer;
+try{ renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'}); }
+catch(e){ document.getElementById('nogl').style.display='flex'; throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x000000);
+const camera=new THREE.PerspectiveCamera(35,1,.1,500);
+camera.position.set(0,0,10);
+
+const pmrem=new THREE.PMREMGenerator(renderer);
+scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture;
+
+const SUN=new THREE.Vector3(5,2.2,4).normalize();
+const sun=new THREE.DirectionalLight(0xffffff,3.4); sun.position.copy(SUN).multiplyScalar(20); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x9fbfff,0x050505,.22));
+
+// ---------- helpers ----------
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const ease=x=>{x=clamp(x);return x*x*(3-2*x);};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const M=(color,rough=.5,metal=.1,extra={})=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal,envMapIntensity:.7,...extra});
+function canvasTex(w,h,draw,srgb=true){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);if(srgb)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;}
+
+const solarTex=canvasTex(512,256,(g,w,h)=>{
+  g.fillStyle='#c9ccd2';g.fillRect(0,0,w,h);
+  const cols=16,rows=8,pad=2;
+  for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){
+    const x=i*w/cols+pad,y=j*h/rows+pad,cw=w/cols-pad*2,ch=h/rows-pad*2;
+    const gr=g.createLinearGradient(x,y,x+cw,y+ch);gr.addColorStop(0,'#1b2f63');gr.addColorStop(.5,'#0c1838');gr.addColorStop(1,'#16295a');
+    g.fillStyle=gr;g.fillRect(x,y,cw,ch);
+    g.strokeStyle='rgba(160,180,230,.12)';g.beginPath();g.moveTo(x+cw/2,y);g.lineTo(x+cw/2,y+ch);g.stroke();
+  }
+});
+const foilTex=canvasTex(512,512,(g,w,h)=>{
+  g.fillStyle='#b8862b';g.fillRect(0,0,w,h);
+  for(let i=0;i<900;i++){const x=Math.random()*w,y=Math.random()*h,l=rnd(10,70),a=rnd(0,Math.PI);
+    g.strokeStyle=Math.random()<.5?`rgba(255,226,140,${rnd(.15,.5)})`:`rgba(90,55,10,${rnd(.15,.45)})`;g.lineWidth=rnd(1,4);
+    g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();}
+});
+const foilBump=canvasTex(512,512,(g,w,h)=>{
+  g.fillStyle='#808080';g.fillRect(0,0,w,h);
+  for(let i=0;i<1200;i++){const x=Math.random()*w,y=Math.random()*h,l=rnd(8,60),a=rnd(0,Math.PI);
+    g.strokeStyle=Math.random()<.5?'rgba(255,255,255,.35)':'rgba(0,0,0,.35)';g.lineWidth=rnd(1,5);
+    g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();}
+},false);
+const panelLines=canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#fff';g.fillRect(0,0,w,h);g.strokeStyle='rgba(0,0,0,.18)';g.lineWidth=2;
+  for(let i=1;i<4;i++){g.beginPath();g.moveTo(0,i*h/4);g.lineTo(w,i*h/4);g.stroke();}
+  g.beginPath();g.moveTo(w/2,0);g.lineTo(w/2,h);g.stroke();
+});
+const latticeTex=canvasTex(256,32,(g,w,h)=>{
+  g.clearRect(0,0,w,h);g.strokeStyle='#fff';g.lineWidth=3;
+  g.strokeRect(1.5,1.5,w-3,h-3);g.beginPath();
+  for(let x=0;x<w;x+=32){g.moveTo(x,0);g.lineTo(x+16,h);g.lineTo(x+32,0);g.moveTo(x,0);g.lineTo(x,h);}
+  g.stroke();
+});
+latticeTex.wrapS=THREE.RepeatWrapping;
+
+const MAT={
+  white:M(0xeeeef0,.42,.08),
+  offwhite:M(0xd9d9dc,.55,.1,{map:panelLines}),
+  black:M(0x151517,.6,.3),
+  metal:M(0x8d9096,.28,1),
+  darkMetal:M(0x3c3d42,.35,1),
+  bell:M(0x55565c,.32,1,{side:THREE.DoubleSide}),
+  copper:M(0xb46a3c,.35,1,{side:THREE.DoubleSide}),
+  foil:M(0xffffff,.32,1,{map:foilTex,bumpMap:foilBump,bumpScale:1.2}),
+  solar:M(0xffffff,.32,.55,{map:solarTex,side:THREE.DoubleSide}),
+  radiator:M(0xf4f4f6,.7,0,{side:THREE.DoubleSide}),
+  heat:M(0x2e241c,.85,.1),
+  truss:M(0xaeb1b8,.4,.9,{map:latticeTex,alphaTest:.5,side:THREE.DoubleSide,transparent:false}),
+  accent:M(0x2997ff,.35,.3,{emissive:0x0a3c80,emissiveIntensity:.6}),
+};
+
+function mesh(geo,mat,x=0,y=0,z=0){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);return m;}
+function cyl(r,h,mat,seg=48){return mesh(new THREE.CylinderGeometry(r,r,h,seg),mat);}
+function lathe(pts,mat,seg=64){return mesh(new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),seg),mat);}
+function bell(scale=1,mat=MAT.bell){const pts=[];for(let i=0;i<=12;i++){const t=i/12;pts.push([ (0.045+0.1*Math.pow(t,1.6))*scale, -t*0.26*scale ]);}return lathe(pts,mat,40);}
+
+// ---------- stars ----------
+{
+  const n=6000,pos=new Float32Array(n*3),col=new Float32Array(n*3);
+  for(let i=0;i<n;i++){const v=new THREE.Vector3().randomDirection().multiplyScalar(rnd(120,200));pos.set([v.x,v.y,v.z],i*3);
+    const b=Math.pow(Math.random(),3)*.9+.15,tint=Math.random();col.set([b*(tint<.15?.8:1),b*(tint>.85?.85:.95),b],i*3);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const stars=new THREE.Points(g,new THREE.PointsMaterial({size:1.6,sizeAttenuation:false,vertexColors:true,transparent:true,depthWrite:false}));
+  stars.name='stars';scene.add(stars);
+}
+
+// ---------- Earth ----------
+const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
+const TEX='https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/';
+function placeholder(r,g,b){const t=new THREE.DataTexture(new Uint8Array([r,g,b,255]),1,1);t.needsUpdate=true;return t;}
+const earthU={
+  dayMap:{value:placeholder(30,70,140)},nightMap:{value:placeholder(0,0,0)},specMap:{value:placeholder(0,0,0)},
+  sunDir:{value:SUN.clone()}
+};
+function loadInto(u,file,srgb=true){loader.load(TEX+file,t=>{if(srgb)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;u.value=t;});}
+loadInto(earthU.dayMap,'earth_atmos_2048.jpg');loadInto(earthU.nightMap,'earth_lights_2048.png');loadInto(earthU.specMap,'earth_specular_2048.jpg',false);
+
+const earthGroup=new THREE.Group();scene.add(earthGroup);
+const earthMat=new THREE.ShaderMaterial({uniforms:earthU,
+  vertexShader:`varying vec2 vUv;varying vec3 vN;varying vec3 vW;
+    void main(){vUv=uv;vN=normalize(mat3(modelMatrix)*normal);vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+  fragmentShader:`uniform sampler2D dayMap,nightMap,specMap;uniform vec3 sunDir;varying vec2 vUv;varying vec3 vN;varying vec3 vW;
+    void main(){vec3 n=normalize(vN);vec3 v=normalize(cameraPosition-vW);float d=dot(n,sunDir);
+      vec3 day=texture2D(dayMap,vUv).rgb;vec3 night=texture2D(nightMap,vUv).rgb;float sp=texture2D(specMap,vUv).r;
+      float dayK=smoothstep(-.12,.22,d);
+      vec3 col=day*(max(d,0.)*1.35+.025);
+      vec3 h=normalize(sunDir+v);col+=vec3(1.,.95,.85)*pow(max(dot(n,h),0.),90.)*sp*.35*dayK;
+      col=mix(night*vec3(1.,.82,.55)*1.8,col,dayK);
+      float fr=pow(1.-max(dot(n,v),0.),3.);col+=vec3(.3,.55,1.)*fr*(.25+.9*max(d+.2,0.));
+      gl_FragColor=vec4(col,1.);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`});
+const earth=new THREE.Mesh(new THREE.SphereGeometry(1,128,96),earthMat);
+earth.rotation.y=-1.2;earth.rotation.z=.41;earthGroup.add(earth);
+const cloudMat=new THREE.MeshLambertMaterial({color:0xffffff,transparent:true,opacity:.9,depthWrite:false});
+loader.load(TEX+'earth_clouds_1024.png',t=>{t.colorSpace=THREE.SRGBColorSpace;cloudMat.map=t;cloudMat.needsUpdate=true;});
+cloudMat.opacity=0;
+const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,128,96),cloudMat);clouds.rotation.z=.41;earthGroup.add(clouds);
+const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.14,96,64),new THREE.ShaderMaterial({
+  uniforms:{sunDir:{value:SUN.clone()}},side:THREE.BackSide,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+  vertexShader:`varying vec3 vN;varying vec3 vNW;void main(){vN=normalize(normalMatrix*normal);vNW=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform vec3 sunDir;varying vec3 vN;varying vec3 vNW;void main(){float d=-vN.z;float i=pow(clamp(d/.5,0.,1.),2.2)*(1.-smoothstep(.5,1.,d));
+    float lit=.25+.95*max(dot(-vNW,sunDir)+.3,0.);gl_FragColor=vec4(vec3(.32,.6,1.)*i*lit*1.25,1.);}`}));
+earthGroup.add(atmo);
+
+// ---------- satellites + debris (children of earthGroup) ----------
+const orbitLayer=new THREE.Group();earthGroup.add(orbitLayer);
+function makeSat(type){
+  const g=new THREE.Group();
+  if(type===0){ // classic bus + wings
+    g.add(mesh(new THREE.BoxGeometry(.05,.06,.05),MAT.foil));
+    const w=mesh(new THREE.BoxGeometry(.22,.002,.05),MAT.solar);w.position.x=.14;g.add(w);
+    const w2=w.clone();w2.position.x=-.14;g.add(w2);
+    g.add(mesh(new THREE.CylinderGeometry(.002,.002,.06),MAT.metal,0,0,0));
+    const dish=mesh(new THREE.SphereGeometry(.025,20,10,0,Math.PI*2,0,.9),MAT.white,0,.045,0);g.add(dish);
+  }else if(type===1){ // flat broadband sat
+    g.add(mesh(new THREE.BoxGeometry(.07,.008,.04),MAT.darkMetal));
+    const p=mesh(new THREE.BoxGeometry(.2,.002,.06),MAT.solar,.13,.01,0);g.add(p);
+  }else if(type===2){ // ISS-like
+    const t=mesh(new THREE.BoxGeometry(.32,.012,.012),MAT.metal);g.add(t);
+    for(const x of[-.15,-.11,.11,.15])for(const y of[-1,1]){const p=mesh(new THREE.BoxGeometry(.03,.09,.002),MAT.solar,x,y*.05,0);g.add(p);}
+    const m=mesh(new THREE.CylinderGeometry(.012,.012,.14,16),MAT.white);m.rotation.x=Math.PI/2;g.add(m);
+  }else{ // telescope
+    const b=mesh(new THREE.CylinderGeometry(.022,.022,.11,24),MAT.metal);b.rotation.z=Math.PI/2;g.add(b);
+    for(const z of[-1,1])g.add(mesh(new THREE.BoxGeometry(.08,.002,.03),MAT.solar,0,0,z*.04));
+  }
+  return g;
+}
+const sats=[];
+function addSat(type,r,inc,node,speed,a){
+  const pivot=new THREE.Group();pivot.rotation.set(inc,node,0,'YXZ');orbitLayer.add(pivot);
+  const s=makeSat(type);pivot.add(s);
+  const pts=[];for(let i=0;i<=128;i++){const t=i/128*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(t)*r,0,Math.sin(t)*r));}
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:type===2?0x64d2ff:0xffffff,transparent:true,opacity:type===2?.35:.08,depthWrite:false}));
+  pivot.add(line);
+  const o={pivot,s,r,speed,a,type,line};sats.push(o);return o;
+}
+const ISS=addSat(2,1.16,.9,0.6,.32,.6);
+const HST=addSat(3,1.22,.5,2.2,.27,2.1);
+for(let i=0;i<34;i++)addSat(Math.random()<.55?1:0,rnd(1.18,1.9),rnd(-1.4,1.4),rnd(0,6.28),rnd(.08,.28)*(Math.random()<.85?1:-1),rnd(0,6.28));
+const DEB=3200,debData=[],debPos=new Float32Array(DEB*3);
+for(let i=0;i<DEB;i++){const band=Math.random()<.75;debData.push({r:band?rnd(1.08,1.3):rnd(1.3,2.2),inc:rnd(-1.5,1.5),node:rnd(0,6.28),a:rnd(0,6.28),s:rnd(.1,.35)});}
+const debGeo=new THREE.BufferGeometry();debGeo.setAttribute('position',new THREE.BufferAttribute(debPos,3));
+const debMat=new THREE.PointsMaterial({color:0xffc9a0,size:.012,transparent:true,opacity:.8,depthWrite:false});
+const debris=new THREE.Points(debGeo,debMat);orbitLayer.add(debris);
+const _e=new THREE.Euler(),_q=new THREE.Quaternion(),_v=new THREE.Vector3();
+function updateOrbits(dt){
+  for(const o of sats){o.a+=o.speed*dt;o.s.position.set(Math.cos(o.a)*o.r,0,Math.sin(o.a)*o.r);o.s.rotation.y=-o.a;}
+  for(let i=0;i<DEB;i++){const d=debData[i];d.a+=d.s*dt;_v.set(Math.cos(d.a)*d.r,0,Math.sin(d.a)*d.r);_e.set(d.inc,d.node,0,'YXZ');_v.applyEuler(_e);debPos[i*3]=_v.x;debPos[i*3+1]=_v.y;debPos[i*3+2]=_v.z;}
+  debGeo.attributes.position.needsUpdate=true;
+}
+
+// ---------- Rocket ----------
+const rocket=new THREE.Group();scene.add(rocket);
+const rk=new THREE.Group();rocket.add(rk);
+const parts=[];
+function part(obj,from,t0){obj.userData.base=obj.position.clone();obj.userData.from=new THREE.Vector3(...from);obj.userData.t0=t0;parts.push(obj);rk.add(obj);return obj;}
+{
+  const core=new THREE.Group();
+  core.add(mesh(new THREE.CylinderGeometry(.26,.26,2.0,64),MAT.white,0,-.6,0));
+  core.add(mesh(new THREE.CylinderGeometry(.262,.262,.05,64),MAT.accent,0,-.05,0));
+  core.add(mesh(new THREE.CylinderGeometry(.264,.264,.16,64),MAT.black,0,-1.62,0));
+  for(let i=0;i<4;i++){const f=mesh(new THREE.BoxGeometry(.012,.18,.1),MAT.darkMetal,0,.32,0);f.position.x=Math.cos(i*Math.PI/2)*.27;f.position.z=Math.sin(i*Math.PI/2)*.27;f.rotation.y=-i*Math.PI/2;core.add(f);}
+  part(core,[0,-3,0],0);
+  const engines=new THREE.Group();
+  for(let i=0;i<3;i++){const a=i/3*Math.PI*2,b=bell(1.05);b.position.set(Math.cos(a)*.12,-1.7,Math.sin(a)*.12);engines.add(b);}
+  part(engines,[0,-3,0],.08);
+  const inter=mesh(new THREE.CylinderGeometry(.262,.262,.26,64),MAT.black,0,.53,0);part(inter,[0,3,0],.2);
+  const s2=new THREE.Group();s2.add(mesh(new THREE.CylinderGeometry(.245,.245,.62,64),MAT.white,0,.97,0));
+  s2.add(mesh(new THREE.CylinderGeometry(.247,.247,.03,64),MAT.accent,0,1.2,0));part(s2,[0,3.5,0],.3);
+  const fp=[];for(let i=0;i<=24;i++){const t=i/24;fp.push([.25*Math.pow(Math.cos(t*Math.PI/2),.55)+(t===1?0:0),1.28+t*.95]);}
+  fp.unshift([.25,1.27]);
+  const fairing=lathe(fp,MAT.white,64);part(fairing,[0,4,0],.42);
+}
+const boosters=[];
+function makeBooster(ang,t0){
+  const g=new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(.13,.13,1.45,48),MAT.white,0,0,0));
+  g.add(mesh(new THREE.CylinderGeometry(.132,.132,.12,48),MAT.black,0,-.66,0));
+  g.add(lathe(Array.from({length:17},(_,i)=>{const t=i/16;return[.13*Math.pow(Math.cos(t*Math.PI/2),.6),.725+t*.38];}),MAT.white,48));
+  const b=bell(.8);b.position.y=-.72;g.add(b);
+  const strut=mesh(new THREE.BoxGeometry(.18,.04,.04),MAT.darkMetal,-.13,.5,0);g.add(strut);
+  const R=.41;g.position.set(Math.cos(ang)*R,-.95,Math.sin(ang)*R);g.rotation.y=-ang;
+  part(g,[Math.cos(ang)*2.2,-.4,Math.sin(ang)*2.2],t0);boosters.push(g);return g;
+}
+makeBooster(0,.55);makeBooster(Math.PI,.55);makeBooster(Math.PI/2,.74);makeBooster(-Math.PI/2,.74);
+const flameMat=new THREE.MeshBasicMaterial({color:0xffb46b,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+const flameCore=new THREE.MeshBasicMaterial({color:0xcfe4ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+const flames=new THREE.Group();rk.add(flames);
+function addFlame(x,y,z,s){const f=mesh(new THREE.ConeGeometry(.11*s,1.4*s,24,1,true),flameMat,x,y-.7*s,z);f.rotation.x=Math.PI;flames.add(f);
+  const c=mesh(new THREE.ConeGeometry(.05*s,.6*s,16,1,true),flameCore,x,y-.3*s,z);c.rotation.x=Math.PI;flames.add(c);}
+for(let i=0;i<3;i++){const a=i/3*Math.PI*2;addFlame(Math.cos(a)*.12,-1.96,Math.sin(a)*.12,1);}
+for(const a of[0,Math.PI,Math.PI/2,-Math.PI/2])addFlame(Math.cos(a)*.41,-1.88,Math.sin(a)*.41,.8);
+rocket.scale.setScalar(.95);
+
+// ---------- Spacecraft ----------
+const craft=new THREE.Group();scene.add(craft);
+const cs=new THREE.Group();craft.add(cs);
+const hullMat=M(0xededf0,.38,.1);
+{
+  cs.add(mesh(new THREE.CylinderGeometry(.62,.62,.06,64),MAT.heat,0,.0,0));
+  const cap=lathe([[.6,0],[.58,.05],[.24,.66],[.17,.7],[0,.7]],hullMat,64);cap.position.y=.03;cs.add(cap);
+  for(let i=0;i<4;i++){const a=i/4*Math.PI*2+.4,w=mesh(new THREE.BoxGeometry(.07,.06,.01),MAT.black);w.position.set(Math.cos(a)*.43,.32,Math.sin(a)*.43);w.lookAt(Math.cos(a)*2,.32+.9,Math.sin(a)*2);cs.add(w);}
+  const ring=mesh(new THREE.TorusGeometry(.14,.025,16,48),MAT.metal,0,.75,0);ring.rotation.x=Math.PI/2;cs.add(ring);
+  cs.add(mesh(new THREE.CylinderGeometry(.56,.58,.1,64),MAT.darkMetal,0,-.08,0));
+  cs.add(mesh(new THREE.CylinderGeometry(.55,.55,.85,64),MAT.foil,0,-.55,0));
+  cs.add(mesh(new THREE.CylinderGeometry(.552,.552,.06,64),hullMat,0,-.2,0));
+  cs.add(mesh(new THREE.CylinderGeometry(.45,.55,.1,64),MAT.darkMetal,0,-1.02,0));
+  const main=bell(2.2,MAT.copper);main.position.y=-1.07;cs.add(main);
+  for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4,q=mesh(new THREE.BoxGeometry(.08,.08,.06),MAT.metal);q.position.set(Math.cos(a)*.57,-.38,Math.sin(a)*.57);q.rotation.y=-a;cs.add(q);
+    for(const dy of[-.05,.05]){const n=mesh(new THREE.ConeGeometry(.015,.04,10),MAT.darkMetal);n.position.set(Math.cos(a)*.6,-.38+dy,Math.sin(a)*.6);n.rotation.z=dy>0?0:Math.PI;cs.add(n);}}
+  const boom=mesh(new THREE.CylinderGeometry(.012,.012,.45,8),MAT.metal);boom.rotation.z=Math.PI/2;boom.position.set(-.75,-.75,0);cs.add(boom);
+  const dish=mesh(new THREE.SphereGeometry(.2,32,16,0,Math.PI*2,0,.75),MAT.white);dish.position.set(-1.0,-.75,0);dish.rotation.z=Math.PI/2;cs.add(dish);
+  dish.add(mesh(new THREE.CylinderGeometry(.008,.008,.18,8),MAT.metal,0,.1,0));
+}
+const wings=[];
+for(let k=0;k<4;k++){
+  const ang=k/4*Math.PI*2+Math.PI/4,w=new THREE.Group();w.rotation.y=-ang;w.position.y=-.6;cs.add(w);
+  const hinge=new THREE.Group();hinge.position.x=.56;w.add(hinge);
+  hinge.add(mesh(new THREE.BoxGeometry(.25,.03,.03),MAT.metal,.12,0,0));
+  for(let s=0;s<3;s++){const p=mesh(new THREE.BoxGeometry(.5,.012,.42),MAT.solar,.27+.52*s,0,0);hinge.add(p);}
+  wings.push({w,hinge});
+}
+craft.rotation.set(.35,0,-.9);craft.scale.setScalar(1.15);
+const HULLS=[{n:'Ceramic white',c:0xededf0,r:.38,m:.1},{n:'Graphite',c:0x2f3034,r:.45,m:.35},{n:'Brushed titanium',c:0xb4b6bb,r:.26,m:1}];
+
+// ---------- Space station ----------
+const station=new THREE.Group();scene.add(station);
+const st=new THREE.Group();station.add(st);
+const stParts=[];
+function sp_(obj,from,t0,grow){obj.userData.base=obj.position.clone();obj.userData.from=new THREE.Vector3(...from);obj.userData.t0=t0;obj.userData.grow=grow;stParts.push(obj);st.add(obj);return obj;}
+function module(len,r,mat=MAT.offwhite){const g=new THREE.Group();const c=mesh(new THREE.CylinderGeometry(r,r,len,48),mat);c.rotation.x=Math.PI/2;g.add(c);
+  for(const z of[-len/2,len/2]){const e=mesh(new THREE.CylinderGeometry(r*.75,r,.06,48),MAT.metal);e.rotation.x=Math.PI/2*(z>0?1:-1);e.position.z=z+(z>0?.03:-.03);g.add(e);}
+  for(let i=0;i<3;i++){const b=mesh(new THREE.TorusGeometry(r+.004,.008,8,48),MAT.metal);b.position.z=-len/2+len*(i+1)/4;g.add(b);}return g;}
+{
+  const node=mesh(new THREE.SphereGeometry(.3,48,32),MAT.offwhite);sp_(node,[0,0,0],0);
+  const lab=module(1.15,.26);lab.position.z=.85;sp_(lab,[0,0,3],.08);
+  const hab=module(1.15,.26);hab.position.z=-.85;sp_(hab,[0,0,-3],.18);
+  const node2=mesh(new THREE.SphereGeometry(.26,48,32),MAT.offwhite,0,0,1.65);sp_(node2,[0,0,3],.28);
+  const hab2=module(.9,.24,MAT.foil);hab2.position.z=2.3;sp_(hab2,[0,0,3],.36);
+  const side=module(.8,.22);side.rotation.y=Math.PI/2;side.position.set(.62,0,1.65);sp_(side,[3,0,0],.44);
+  const cup=mesh(new THREE.CylinderGeometry(.1,.14,.12,8),MAT.metal,0,-.31,0);sp_(cup,[0,-2,0],.48);
+  const mast=mesh(new THREE.BoxGeometry(.06,.35,.06),MAT.metal,0,.45,0);sp_(mast,[0,2,0],.12);
+  const trussL=new THREE.Group(),trussR=new THREE.Group();
+  for(const [g,dir] of [[trussL,-1],[trussR,1]]){
+    const t=mesh(new THREE.BoxGeometry(3.3,.16,.16),MAT.truss);t.material=MAT.truss.clone();t.material.map=latticeTex.clone();t.material.map.repeat.set(10,1);t.material.map.needsUpdate=true;t.position.x=dir*1.65;g.add(t);
+    g.add(mesh(new THREE.BoxGeometry(3.3,.04,.04),MAT.darkMetal,dir*1.65,0,0));
+    g.position.y=.62;
+  }
+  sp_(trussL,[-4,0,0],.22);sp_(trussR,[4,0,0],.22);
+  const wingsSt=[];
+  for(const x of[-3.0,-2.35,2.35,3.0])for(const y of[-1,1]){
+    const w=new THREE.Group();w.position.set(x,.62,0);
+    const p=mesh(new THREE.BoxGeometry(.5,1.7,.012),MAT.solar,0,y*.95,0);w.add(p);
+    w.add(mesh(new THREE.BoxGeometry(.02,1.75,.02),MAT.metal,0,y*.95,0));
+    sp_(w,[0,0,0],.55+Math.abs(x)*.04+(y>0?0:.03),true);wingsSt.push(w);
+  }
+  for(const x of[-1.1,1.1]){const r=new THREE.Group();r.position.set(x,.62,0);r.add(mesh(new THREE.BoxGeometry(.9,.012,.42),MAT.radiator,0,-.0,-.4));sp_(r,[0,0,0],.82,true);}
+}
+station.rotation.set(.5,-.6,.1);station.scale.setScalar(.82);
+
+// ---------- layout / keyframes ----------
+const tags=[document.getElementById('tag0'),document.getElementById('tag1'),document.getElementById('tag2')];
+const scenes=[...document.querySelectorAll('.scene')],dots=[...document.querySelectorAll('.progress i')],cue=document.querySelector('.cue');
+let W=1,H=1,wide=true;
+function resize(){W=canvas.clientWidth;H=canvas.clientHeight;renderer.setSize(W,H,false);camera.aspect=W/H;
+  wide=W/H>1.05&&W>820;camera.fov=wide?35:Math.min(60,35/Math.min(1,W/H)*.8);camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+
+const OFF={x:14,y:0,z:0,s:1};
+function keys(){
+  const sx=wide?2.35:0, sy=wide?0:1.05, sc=wide?1:.78;
+  return {
+    earth:[{x:0,y:wide?-3.1:-2.4,z:0,s:wide?2.5:1.7},{x:0,y:wide?.55:.9,z:0,s:wide?1.3:1.0},{x:wide?4:0,y:-5,z:-14,s:4.2},{x:wide?6:0,y:-6,z:-16,s:5},{x:wide?5:0,y:-6.5,z:-14,s:5},{x:0,y:-7.1,z:-2,s:4.3}],
+    orbit:[0,1,0,0,0,0],
+    rocket:[{x:14,y:0,z:0,s:sc},{x:14,y:0,z:0,s:sc},{x:sx,y:sy-.05,z:0,s:sc},{x:sx,y:sy+9,z:0,s:sc},{x:sx,y:14,z:0,s:sc},{x:sx,y:14,z:0,s:sc}],
+    craft:[{...OFF,s:sc},{...OFF,s:sc},{...OFF,s:sc},{x:sx,y:sy,z:0,s:sc*1.15},{x:12,y:1.5,z:-3,s:sc},{x:wide?1.5:.6,y:wide?1.55:2.1,z:0,s:sc*.42}],
+    station:[{...OFF,s:sc},{...OFF,s:sc},{...OFF,s:sc},{x:15,y:0,z:0,s:sc*.82},{x:sx-(wide?.2:0),y:sy,z:0,s:sc*.82},{x:wide?-.4:0,y:wide?.95:1.5,z:-1,s:sc*.72}],
+  };
+}
+function kf(arr,f){const i=Math.min(arr.length-2,Math.floor(f)),t=ease(f-i),a=arr[i],b=arr[i+1];
+  if(typeof a==='number')return lerp(a,b,t);return{x:lerp(a.x,b.x,t),y:lerp(a.y,b.y,t),z:lerp(a.z,b.z,t),s:lerp(a.s,b.s,t)};}
+function place(o,k){o.position.set(k.x,k.y,k.z);o.scale.setScalar(k.s);o.visible=Math.abs(k.x)<11&&k.y<10;}
+
+const chips={};document.querySelectorAll('.chip').forEach(c=>chips[c.dataset.c]=c);
+function setChip(key,val){const c=chips[key];const em=c.firstChild.outerHTML;const html=em+val;if(c._v!==val){c._v=val;c.innerHTML=html;c.classList.add('flash');setTimeout(()=>c.classList.remove('flash'),350);}}
+
+// ---------- loop ----------
+let sp=0,running=true,last=performance.now(),t=0;
+new IntersectionObserver(es=>{running=es[0].isIntersecting;if(running){last=performance.now();requestAnimationFrame(frame);}},{threshold:0}).observe(stage);
+function scrollP(){const r=stage.getBoundingClientRect(),tot=stage.offsetHeight-innerHeight;return clamp(-r.top/(tot||1));}
+const _p=new THREE.Vector3();
+function tagAt(el,obj,show){if(!show){el.style.opacity=0;return;}obj.getWorldPosition(_p);_p.project(camera);
+  if(_p.z>1){el.style.opacity=0;return;}el.style.opacity=1;el.style.left=((_p.x*.5+.5)*W)+'px';el.style.top=((-_p.y*.5+.5)*H)+'px';}
+
+function frame(now){
+  if(!running)return;
+  const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;
+  sp+=(scrollP()-sp)*Math.min(1,dt*6);
+  const f=sp*5,K=keys();
+
+  // Earth
+  place(earthGroup,kf(K.earth,f));earthGroup.visible=true;
+  earth.rotation.y+=dt*.035;clouds.rotation.y+=dt*.045;
+  if(cloudMat.map)cloudMat.opacity=lerp(cloudMat.opacity,.95,.05);
+  const ov=kf(K.orbit,f);orbitLayer.scale.setScalar(lerp(.6,1,ov));orbitLayer.visible=ov>.01;
+  orbitLayer.traverse(o=>{if(o.material&&o!==debris&&o.isLine)o.material.opacity=(o.material.color.getHex()===0x64d2ff?.35:.08)*ov;});
+  debMat.opacity=.8*ov;
+  if(orbitLayer.visible)updateOrbits(dt);
+  tagAt(tags[0],ISS.s,ov>.92);tagAt(tags[1],HST.s,ov>.92&&wide);tagAt(tags[2],sats[9].s,ov>.92&&wide);
+
+  // Rocket
+  place(rocket,kf(K.rocket,f));
+  const ra=clamp((f-1.45)/.85);
+  for(const p of parts){const d=ease((ra-p.userData.t0)/.2);p.position.copy(p.userData.base).addScaledVector(p.userData.from,1-d);p.visible=d>.001;}
+  rk.rotation.y=t*.25;rocket.rotation.z=wide?-.08:0;
+  const launch=clamp((f-2.25)/.4);flameMat.opacity=.55*launch;flameCore.opacity=.9*launch;
+  flames.children.forEach((c,i)=>{c.scale.y=1+Math.sin(t*40+i)*.08+launch*.4;});
+  rocket.position.x+=launch>0?Math.sin(t*50)*.004*launch:0;
+  if(f>1.2&&f<2.8){setChip('stages',ra>.3?'2':'1');setChip('boost',String(ra>.78?4:ra>.6?2:0));setChip('eng',String(3+(ra>.6?2:0)+(ra>.78?2:0)));setChip('fair',ra>.48?'Standard 5 m':'—');}
+
+  // Spacecraft
+  place(craft,kf(K.craft,f));
+  const ca=clamp((f-2.55)/.9);
+  wings.forEach((w,i)=>{const on=i<2||ca>.55;w.w.visible=on;const dep=ease((ca-(i<2?.05:.6))/.3);w.hinge.rotation.z=-Math.PI/2*(1-dep);w.hinge.scale.setScalar(lerp(.02,1,ease(dep*3)));});
+  const hi=f>4.2?0:ca>.7?2:ca>.38?1:0,h=HULLS[hi];
+  hullMat.color.lerp(new THREE.Color(h.c),.12);hullMat.roughness=lerp(hullMat.roughness,h.r,.12);hullMat.metalness=lerp(hullMat.metalness,h.m,.12);
+  cs.rotation.y=t*.3;
+  if(f>2.2&&f<3.8){setChip('hull',h.n);setChip('arr',String(ca>.55?4:2));}
+  if(f>4.5){craft.rotation.set(0,Math.PI/2,-Math.PI/2+.0);cs.rotation.y=t*.15;}else craft.rotation.set(.35,0,-.9);
+
+  // Station
+  place(station,kf(K.station,f));
+  const sa=f>4.6?1:clamp((f-3.45)/.75);
+  let mods=0,wn=0;
+  for(const p of stParts){const d=ease((sa-p.userData.t0)/.16);
+    if(p.userData.grow){p.position.copy(p.userData.base);p.scale.set(1,Math.max(.001,d),1);p.visible=d>.001;if(d>.5&&p.children.length===2)wn++;}
+    else{p.position.copy(p.userData.base).addScaledVector(p.userData.from,1-d);p.visible=d>.001;if(d>.98&&p.isGroup===false&&p.geometry&&p.geometry.type==='SphereGeometry')mods++;else if(d>.98&&p.children.length>=3)mods++;}}
+  st.rotation.y=Math.sin(t*.15)*.25;
+  if(f>3.2&&f<4.8){setChip('mods',String(Math.max(1,mods)));setChip('wings',String(Math.round(wn/2)));setChip('crew',String(Math.max(0,mods-1)*2));}
+
+  // camera drift
+  camera.position.x=Math.sin(t*.07)*.15;camera.position.y=Math.cos(t*.05)*.1;camera.lookAt(0,0,0);
+  scene.getObjectByName('stars').rotation.y=sp*.6+t*.003;
+
+  // UI
+  const idx=Math.round(f);
+  scenes.forEach((s,i)=>s.classList.toggle('on',i===idx));dots.forEach((d,i)=>d.classList.toggle('on',i===idx));
+  cue.style.opacity=sp<.02?1:0;
+
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
